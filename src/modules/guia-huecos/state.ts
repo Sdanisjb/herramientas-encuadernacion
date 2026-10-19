@@ -4,7 +4,17 @@ import { DEFAULT_FORM, type GuideForm } from './geometry/guide';
 const STORAGE_KEY = 'guia-huecos:v1';
 
 const BOOL_KEYS = ['distribute', 'showDimensions', 'linked'] as const;
-const NUM_KEYS = ['count', 'spacing', 'sets', 'xWidth', 'betweenGap', 'headMargin', 'tailMargin', 'holeDiameter'] as const;
+const NUM_KEYS = [
+  'count',
+  'spacing',
+  'sets',
+  'xWidth',
+  'betweenGap',
+  'headMargin',
+  'tailMargin',
+  'holeDiameter',
+  'edgeMargin',
+] as const;
 
 /** Codifica el formulario como parámetros de URL (enlace compartible). */
 export function formToParams(form: GuideForm): URLSearchParams {
@@ -13,6 +23,8 @@ export function formToParams(form: GuideForm): URLSearchParams {
   p.set('paper', form.paper);
   p.set('sizeMode', form.sizeMode);
   p.set('mode', form.mode);
+  p.set('orientation', form.orientation);
+  p.set('bindingSide', form.bindingSide);
   for (const k of NUM_KEYS) p.set(k, String(form[k]));
   for (const k of BOOL_KEYS) p.set(k, form[k] ? '1' : '0');
   return p;
@@ -23,7 +35,13 @@ export function paramsToForm(p: URLSearchParams): GuideForm {
   const form: GuideForm = { ...DEFAULT_FORM };
 
   const binding = p.get('binding');
-  if (binding === 'francesa' || binding === 'robada') form.binding = binding;
+  if (binding === 'francesa' || binding === 'robada' || binding === 'japonesa') form.binding = binding;
+
+  const orientation = p.get('orientation');
+  if (orientation === 'horizontal' || orientation === 'vertical') form.orientation = orientation;
+
+  const bindingSide = p.get('bindingSide');
+  if (bindingSide === 'izquierdo' || bindingSide === 'derecho') form.bindingSide = bindingSide;
 
   const paper = p.get('paper');
   if (paper && (SELECTABLE_PAPERS as string[]).includes(paper)) form.paper = paper as GuideForm['paper'];

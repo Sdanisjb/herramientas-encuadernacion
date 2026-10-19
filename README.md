@@ -6,7 +6,7 @@ Colección de utilidades web para encuadernación. 100 % estática: todo se calc
 
 | Módulo | Ruta | Estado |
 | --- | --- | --- |
-| Guía de huecos (francesa y robada/alternada) | `/#/guia-huecos` | v0.2 |
+| Guía de huecos (francesa, robada/alternada y japonesa) | `/#/guia-huecos` | v0.3 |
 
 ## Desarrollo
 
@@ -49,11 +49,17 @@ src/
   por defecto, igual al ancho de la X (se puede fijar otra). Dos modos: por **cantidad de X** (las distancias se
   calculan para llenar el lomo) o por **medidas exactas** (la cantidad sale de cuántas X caben). Ver `computeSets`.
   Con la separación ligada, el patrón coincide con huecos equiespaciados en número par; se distingue al fijar otra separación.
+- **Japonesa**: la costura va al costado. Huecos equiespaciados en **número impar**, en una línea vertical paralela al
+  borde de la hoja, a una distancia configurable («Margen del borde a los huecos»), con margen superior e inferior
+  independientes. La hoja tiene el tamaño de la página; se elige orientación (horizontal por defecto) y lado de la
+  costura (izquierdo o derecho). La misma plantilla sirve para las páginas y la tapa. Ver `buildJapanese` en `geometry/guide.ts`.
+- La paridad del número de huecos (`parity` en `computeStations`) es `even` en la robada y `odd` en la japonesa: en modo
+  número un valor con otra paridad es un error con sugerencia; en modo espaciado se descarta el último hueco.
 - La vista previa acota el margen de cabeza, la distancia entre huecos consecutivos y el margen de pie, y numera las X.
 - **Robada (alternada)**: un único patrón de huecos equiespaciados, con **número par de huecos**. Lo que la distingue de la
   francesa son los márgenes de cabeza y pie, que se fijan por separado. En modo número, un valor impar es un error; en modo
   espaciado, si caben huecos impares se descarta el último. La regla vive en `evenOnly` de `computeStations`.
-- Imprime siempre el PDF al **100 %** y comprueba la barra de 50 mm.
+- Imprime siempre el PDF al **100 %** y comprueba la barra de escala (50 mm; 25 mm en hojas muy pequeñas).
 
 ## Despliegue gratuito
 

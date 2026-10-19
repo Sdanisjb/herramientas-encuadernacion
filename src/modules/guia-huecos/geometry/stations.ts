@@ -16,8 +16,20 @@ export interface PatternInput {
   spacing: number;
   /** En modo espaciado, reparte el sobrante para que el último hueco caiga justo en el margen de pie. */
   distribute: boolean;
-  /** La encuadernación robada exige un número par de huecos. */
-  evenOnly: boolean;
+  /** Paridad exigida al número de huecos: par (robada), impar (japonesa) o cualquiera (sin restricción). */
+  parity: Parity;
+}
+
+export type Parity = 'any' | 'even' | 'odd';
+
+const PARITY_WORD = { even: 'par', odd: 'impar' } as const;
+const parityMatches = (n: number, parity: Parity) =>
+  parity === 'any' || (parity === 'even' ? n % 2 === 0 : n % 2 !== 0);
+
+/** Vecinos válidos del número `n` para la paridad pedida (p. ej. 7 con 'even' -> 6 y 8). */
+function neighbours(n: number, parity: Exclude<Parity, 'any'>): number[] {
+  const min = parity === 'even' ? 2 : 1;
+  return [n - 1, n + 1].filter((v) => v >= min);
 }
 
 export type StationsResult =
@@ -54,10 +66,12 @@ export function computeStations(p: PatternInput): StationsResult {
     count = Math.round(p.count);
     if (!Number.isFinite(count) || count < 1) return { ok: false, error: 'Indica al menos 1 hueco.' };
     if (count > MAX_HOLES) return { ok: false, error: `El máximo es ${MAX_HOLES} huecos.` };
-    if (p.evenOnly && count % 2 !== 0) {
+    if (p.parity !== 'any' && !parityMatches(count, p.parity)) {
       return {
         ok: false,
-        error: `La encuadernación robada necesita un número par de huecos (prueba con ${Math.max(2, count - 1)} o ${count + 1}).`,
+        error:
+          `El número de huecos debe ser ${PARITY_WORD[p.parity]}. ` +
+          `Los más cercanos son ${neighbours(count, p.parity).join(' y ')}.`,
       };
     }
     spacing = count > 1 ? usable / (count - 1) : 0;
@@ -66,9 +80,9 @@ export function computeStations(p: PatternInput): StationsResult {
       return { ok: false, error: 'El espaciado debe ser mayor que 0.' };
     }
     count = Math.floor(usable / p.spacing + EPS) + 1;
-    // Con ese espaciado cabe un número impar: se descarta el último hueco para quedar en par.
-    if (p.evenOnly && count % 2 !== 0) count -= 1;
-    if (count < 1 || (p.evenOnly && count < 2)) {
+    // Si cabe un número con otra paridad, se descarta el último hueco.
+    if (!parityMatches(count, p.parity)) count -= 1;
+    if (count < 1 || (p.parity === 'even' && count < 2)) {
       return { ok: false, error: 'Con ese espaciado no caben dos huecos entre los márgenes.' };
     }
     if (count > MAX_HOLES) return { ok: false, error: `El espaciado genera más de ${MAX_HOLES} huecos.` };

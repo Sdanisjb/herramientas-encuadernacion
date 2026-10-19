@@ -9,6 +9,13 @@ import { BINDING_LABEL, DEFAULT_FORM, buildGuide, type GuideForm } from '../geom
 import { formToParams, loadStoredForm, paramsToForm, storeForm } from '../state';
 import { NumberField } from './NumberField';
 
+const BINDING_HINT: Record<GuideForm['binding'], string> = {
+  francesa: 'Conjuntos (X) de dos huecos, con la misma separación entre X que el ancho de cada X (o la medida que fijes).',
+  robada: 'Un único patrón de huecos equiespaciados, en número par, con márgenes de cabeza y pie por separado.',
+  japonesa:
+    'La costura va al costado: huecos equiespaciados, en número impar, en una línea paralela al borde. La misma plantilla sirve para las páginas y la tapa.',
+};
+
 export default function GuiaHuecosPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [form, setForm] = useState<GuideForm>(() =>
@@ -19,13 +26,16 @@ export default function GuiaHuecosPage() {
   const set = <K extends keyof GuideForm>(key: K, value: GuideForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  // La robada necesita número par: al elegirla se sube al siguiente par si hacía falta.
+  // La robada necesita número par y la japonesa impar: al elegirlas se ajusta el número de huecos.
   const setBinding = (binding: GuideForm['binding']) =>
-    setForm((f) => ({
-      ...f,
-      binding,
-      count: binding === 'robada' && Number.isFinite(f.count) && f.count % 2 !== 0 ? f.count + 1 : f.count,
-    }));
+    setForm((f) => {
+      let count = f.count;
+      if (Number.isFinite(count)) {
+        if (binding === 'robada' && count % 2 !== 0) count += 1;
+        if (binding === 'japonesa' && count % 2 === 0) count = Math.max(1, count - 1);
+      }
+      return { ...f, binding, count };
+    });
 
   useEffect(() => {
     setSearchParams(formToParams(form), { replace: true });
@@ -35,7 +45,9 @@ export default function GuiaHuecosPage() {
   const guide = useMemo(() => buildGuide(form), [form]);
   const svgs = useMemo(() => (guide.ok ? guide.sheets.map(sheetToSvg) : []), [guide]);
 
-  const baseName = `guia-${form.binding}-${form.paper}-${form.sizeMode === 'sheet' ? 'hoja' : 'pagina'}`;
+  const variant =
+    form.binding === 'japonesa' ? form.orientation : form.sizeMode === 'sheet' ? 'hoja' : 'pagina';
+  const baseName = `guia-${form.binding}-${form.paper}-${variant}`;
 
   const exportPdf = async () => {
     if (!guide.ok) return;
@@ -69,18 +81,14 @@ export default function GuiaHuecosPage() {
         <fieldset>
           <legend>Encuadernación</legend>
           <div className="segmented" role="radiogroup" aria-label="Tipo de encuadernación">
-            {(['francesa', 'robada'] as const).map((b) => (
+            {(['francesa', 'robada', 'japonesa'] as const).map((b) => (
               <label key={b} className={form.binding === b ? 'is-on' : ''}>
                 <input type="radio" name="binding" checked={form.binding === b} onChange={() => setBinding(b)} />
                 {BINDING_LABEL[b]}
               </label>
             ))}
           </div>
-          <p className="hint">
-            {form.binding === 'francesa'
-              ? 'Conjuntos (X) de dos huecos, con la misma separación entre X que el ancho de cada X (o la medida que fijes).'
-              : 'Un único patrón de huecos equiespaciados, en número par, con márgenes de cabeza y pie por separado.'}
-          </p>
+          <p className="hint">{BINDING_HINT[form.binding]}</p>
         </fieldset>
 
         <fieldset>
@@ -95,21 +103,49 @@ export default function GuiaHuecosPage() {
               ))}
             </select>
           </label>
-          <div className="segmented" role="radiogroup" aria-label="Interpretación del tamaño">
-            <label className={form.sizeMode === 'sheet' ? 'is-on' : ''}>
-              <input type="radio" name="sizeMode" checked={form.sizeMode === 'sheet'} onChange={() => set('sizeMode', 'sheet')} />
-              Hoja sin plegar
-            </label>
-            <label className={form.sizeMode === 'page' ? 'is-on' : ''}>
-              <input type="radio" name="sizeMode" checked={form.sizeMode === 'page'} onChange={() => set('sizeMode', 'page')} />
-              Página del libro
-            </label>
-          </div>
-          <p className="hint">
-            {form.sizeMode === 'sheet'
-              ? 'Se imprime en una hoja de ese tamaño; el lomo mide el lado corto.'
-              : 'El tamaño es el de la página ya plegada; la hoja a imprimir es el tamaño siguiente.'}
-          </p>
+          {form.binding === 'japonesa' ? (
+            <>
+              <div className="segmented" role="radiogroup" aria-label="Orientación de la hoja">
+                <label className={form.orientation === 'horizontal' ? 'is-on' : ''}>
+                  <input type="radio" name="orientation" checked={form.orientation === 'horizontal'} onChange={() => set('orientation', 'horizontal')} />
+                  Horizontal
+                </label>
+                <label className={form.orientation === 'vertical' ? 'is-on' : ''}>
+                  <input type="radio" name="orientation" checked={form.orientation === 'vertical'} onChange={() => set('orientation', 'vertical')} />
+                  Vertical
+                </label>
+              </div>
+              <div className="segmented" role="radiogroup" aria-label="Lado de la encuadernación">
+                <label className={form.bindingSide === 'izquierdo' ? 'is-on' : ''}>
+                  <input type="radio" name="bindingSide" checked={form.bindingSide === 'izquierdo'} onChange={() => set('bindingSide', 'izquierdo')} />
+                  Costura a la izquierda
+                </label>
+                <label className={form.bindingSide === 'derecho' ? 'is-on' : ''}>
+                  <input type="radio" name="bindingSide" checked={form.bindingSide === 'derecho'} onChange={() => set('bindingSide', 'derecho')} />
+                  Costura a la derecha
+                </label>
+              </div>
+              <p className="hint">Se imprime en una hoja del tamaño de la página; los huecos van a lo largo del lado vertical elegido.</p>
+            </>
+          ) : (
+            <>
+              <div className="segmented" role="radiogroup" aria-label="Interpretación del tamaño">
+                <label className={form.sizeMode === 'sheet' ? 'is-on' : ''}>
+                  <input type="radio" name="sizeMode" checked={form.sizeMode === 'sheet'} onChange={() => set('sizeMode', 'sheet')} />
+                  Hoja sin plegar
+                </label>
+                <label className={form.sizeMode === 'page' ? 'is-on' : ''}>
+                  <input type="radio" name="sizeMode" checked={form.sizeMode === 'page'} onChange={() => set('sizeMode', 'page')} />
+                  Página del libro
+                </label>
+              </div>
+              <p className="hint">
+                {form.sizeMode === 'sheet'
+                  ? 'Se imprime en una hoja de ese tamaño; el lomo mide el lado corto.'
+                  : 'El tamaño es el de la página ya plegada; la hoja a imprimir es el tamaño siguiente.'}
+              </p>
+            </>
+          )}
         </fieldset>
 
         <fieldset>
@@ -152,7 +188,14 @@ export default function GuiaHuecosPage() {
               </p>
             </>
           ) : form.mode === 'count' ? (
-            <NumberField label="Número de huecos (par)" value={form.count} step={2} min={2} unit="" onChange={(v) => set('count', v)} />
+            <NumberField
+              label={form.binding === 'japonesa' ? 'Número de huecos (impar)' : 'Número de huecos (par)'}
+              value={form.count}
+              step={2}
+              min={form.binding === 'japonesa' ? 1 : 2}
+              unit=""
+              onChange={(v) => set('count', v)}
+            />
           ) : (
             <>
               <NumberField label="Espaciado entre huecos" value={form.spacing} step={0.5} min={0.5} onChange={(v) => set('spacing', v)} />
@@ -160,14 +203,35 @@ export default function GuiaHuecosPage() {
                 <input type="checkbox" checked={form.distribute} onChange={(e) => set('distribute', e.target.checked)} />
                 Distribuir el sobrante entre los huecos
               </label>
-              <p className="hint">Si con ese espaciado caben huecos impares, se descarta el último para quedar en par.</p>
+              <p className="hint">
+                {form.binding === 'japonesa'
+                  ? 'Si con ese espaciado caben huecos pares, se descarta el último para quedar en impar.'
+                  : 'Si con ese espaciado caben huecos impares, se descarta el último para quedar en par.'}
+              </p>
             </>
           )}
+          {form.binding === 'japonesa' && (
+            <NumberField label="Margen del borde a los huecos" value={form.edgeMargin} step={0.5} min={0.5} onChange={(v) => set('edgeMargin', v)} />
+          )}
           <div className="row">
-            <NumberField label="Margen de cabeza" value={form.headMargin} min={0} onChange={(v) => set('headMargin', v)} />
-            <NumberField label="Margen de pie" value={form.tailMargin} min={0} onChange={(v) => set('tailMargin', v)} />
+            <NumberField
+              label={form.binding === 'japonesa' ? 'Margen superior' : 'Margen de cabeza'}
+              value={form.headMargin}
+              min={0}
+              onChange={(v) => set('headMargin', v)}
+            />
+            <NumberField
+              label={form.binding === 'japonesa' ? 'Margen inferior' : 'Margen de pie'}
+              value={form.tailMargin}
+              min={0}
+              onChange={(v) => set('tailMargin', v)}
+            />
           </div>
-          <p className="hint">Distancia del primer y del último hueco al borde del lomo.</p>
+          <p className="hint">
+            {form.binding === 'japonesa'
+              ? 'Distancia del borde superior de la hoja al primer hueco y del último hueco al borde inferior.'
+              : 'Distancia del primer y del último hueco al borde del lomo.'}
+          </p>
         </fieldset>
 
         <fieldset>
@@ -218,10 +282,17 @@ export default function GuiaHuecosPage() {
                     <dd>{guide.summary.spacing !== null ? `${fmt(guide.summary.spacing, 2)} mm` : '—'}</dd>
                   </div>
                 )}
-                <div>
-                  <dt>Lomo</dt>
-                  <dd>{fmt(guide.summary.spineLength)} mm</dd>
-                </div>
+                {guide.summary.edgeMargin !== null ? (
+                  <div>
+                    <dt>Borde a huecos</dt>
+                    <dd>{fmt(guide.summary.edgeMargin, 2)} mm</dd>
+                  </div>
+                ) : (
+                  <div>
+                    <dt>Lomo</dt>
+                    <dd>{fmt(guide.summary.spineLength)} mm</dd>
+                  </div>
+                )}
                 <div>
                   <dt>Hoja</dt>
                   <dd>
@@ -257,7 +328,7 @@ export default function GuiaHuecosPage() {
               ))}
             </div>
             <p className="hint">
-              Para que las medidas sean exactas, imprime el PDF al 100 % (tamaño real) y comprueba la barra de 50 mm con una regla.
+              Para que las medidas sean exactas, imprime el PDF al 100 % (tamaño real) y comprueba la barra de escala con una regla.
             </p>
           </>
         )}

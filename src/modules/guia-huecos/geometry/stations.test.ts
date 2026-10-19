@@ -9,8 +9,9 @@ const base: PatternInput = {
   count: 7,
   spacing: 30,
   distribute: false,
-  evenOnly: false,
+  parity: 'any',
 };
+
 function ok(input: PatternInput) {
   const r = computeStations(input);
   if (!r.ok) throw new Error(r.error);
@@ -74,8 +75,8 @@ describe('computeStations', () => {
   });
 });
 
-describe('computeStations con evenOnly (robada)', () => {
-  const even: PatternInput = { ...base, evenOnly: true };
+describe('computeStations con paridad par (robada)', () => {
+  const even: PatternInput = { ...base, parity: 'even' };
 
   it('acepta número par en modo número', () => {
     const r = ok({ ...even, count: 8 });
@@ -86,7 +87,7 @@ describe('computeStations con evenOnly (robada)', () => {
   it('rechaza número impar y sugiere vecinos pares', () => {
     const r = computeStations({ ...even, count: 7 });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain('6 o 8');
+    if (!r.ok) expect(r.error).toContain('6 y 8');
   });
 
   it('modo espaciado: si salen impares descarta el último', () => {
@@ -203,5 +204,61 @@ describe('computeSets (francesa)', () => {
     expect(computeSets({ ...sets, linked: false, betweenGap: 100 }).ok).toBe(false); // 2 x 100 > 180
     expect(computeSets({ ...sets, headMargin: 150, tailMargin: 100 }).ok).toBe(false);
     expect(computeSets({ ...sets, sets: 0 }).ok).toBe(false);
+  });
+});
+
+describe('computeStations con paridad impar (japonesa)', () => {
+  const odd: PatternInput = { ...base, parity: 'odd' };
+
+  it('acepta número impar en modo número', () => {
+    const r = ok({ ...odd, count: 5 });
+    expect(r.count).toBe(5);
+    expect(r.spacing).toBeCloseTo(45);
+    expect(r.positions[4]).toBeCloseTo(195);
+  });
+
+  it('rechaza número par y sugiere vecinos impares', () => {
+    const r = computeStations({ ...odd, count: 6 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain('impar');
+      expect(r.error).toContain('5 y 7');
+    }
+  });
+
+  it('un hueco es válido y se centra', () => {
+    const r = ok({ ...odd, count: 1 });
+    expect(r.positions).toEqual([105]);
+  });
+
+  it('con 2 huecos sugiere solo 1 y 3', () => {
+    const r = computeStations({ ...odd, count: 2 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('1 y 3');
+  });
+
+  it('modo espaciado: si salen pares descarta el último', () => {
+    // usable 180, espaciado 25 -> 8 huecos -> se queda en 7, sobran 30
+    const r = ok({ ...odd, mode: 'spacing', spacing: 25 });
+    expect(r.count).toBe(7);
+    expect(r.spacing).toBe(25);
+    expect(r.leftover).toBeCloseTo(30);
+  });
+
+  it('modo espaciado impar se deja tal cual', () => {
+    const r = ok({ ...odd, mode: 'spacing', spacing: 30 }); // 7 huecos
+    expect(r.count).toBe(7);
+    expect(r.leftover).toBe(0);
+  });
+
+  it('con espaciado mayor que el largo útil queda un solo hueco', () => {
+    expect(ok({ ...odd, mode: 'spacing', spacing: 500 }).count).toBe(1);
+  });
+
+  it('distribuir reparte el sobrante entre los huecos impares', () => {
+    const r = ok({ ...odd, mode: 'spacing', spacing: 25, distribute: true });
+    expect(r.count).toBe(7);
+    expect(r.spacing).toBeCloseTo(30);
+    expect(r.positions[6]).toBeCloseTo(195);
   });
 });
